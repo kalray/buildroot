@@ -1,4 +1,4 @@
-menu "Target options"
+	menu "Target options"
 
 config BR2_ARCH_IS_64
 	bool
@@ -76,6 +76,14 @@ config BR2_i386
 	help
 	  Intel i386 architecture compatible microprocessor
 	  http://en.wikipedia.org/wiki/I386
+
+config BR2_kvx
+	bool "kvx"
+	select BR2_ARCH_IS_64
+	select BR2_ARCH_HAS_MMU_MANDATORY
+	help
+	  Kalray MPPA architecture support.
+	  https://www.kalrayinc.com/portfolio/processors/
 
 config BR2_m68k
 	bool "m68k"
@@ -373,6 +381,10 @@ endif
 
 if BR2_arm || BR2_armeb || BR2_aarch64 || BR2_aarch64_be
 source "arch/Config.in.arm"
+endif
+
+if BR2_kvx
+source "arch/Config.in.kvx"
 endif
 
 if BR2_m68k
