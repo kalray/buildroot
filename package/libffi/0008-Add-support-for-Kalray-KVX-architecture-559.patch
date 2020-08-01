@@ -1,0 +1,580 @@
+From 0a31dd91d9d1e53021b30541355d2be791ac57ba Mon Sep 17 00:00:00 2001
+From: Yann Sionneau <yann@sionneau.net>
+Date: Fri, 1 May 2020 13:59:11 +0200
+Subject: [PATCH] Add support for Kalray KVX architecture (#559)
+
+[Backport from upstream 5e6ca054148dfb4d78e6f79457d48b745f919def]
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+---
+ Makefile.am         |   6 +-
+ README.md           |   1 +
+ configure.host      |   5 +
+ src/kvx/asm.h       |   5 +
+ src/kvx/ffi.c       | 273 ++++++++++++++++++++++++++++++++++++++++++++
+ src/kvx/ffitarget.h |  75 ++++++++++++
+ src/kvx/sysv.S      | 127 +++++++++++++++++++++
+ 7 files changed, 490 insertions(+), 2 deletions(-)
+ create mode 100644 src/kvx/asm.h
+ create mode 100644 src/kvx/ffi.c
+ create mode 100644 src/kvx/ffitarget.h
+ create mode 100644 src/kvx/sysv.S
+
+diff --git a/Makefile.am b/Makefile.am
+index 4fd6193..bfc6b67 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -74,7 +74,8 @@ noinst_HEADERS = \
+ 	src/vax/ffitarget.h						\
+ 	src/x86/ffitarget.h src/x86/internal.h src/x86/internal64.h src/x86/asmnames.h \
+ 	src/xtensa/ffitarget.h						\
+-	src/dlmalloc.c
++	src/dlmalloc.c								\
++	src/kvx/ffitarget.h
+ 
+ EXTRA_libffi_la_SOURCES = src/aarch64/ffi.c src/aarch64/sysv.S \
+ 	src/aarch64/win64_armasm.S src/alpha/ffi.c src/alpha/osf.S \
+@@ -102,7 +103,8 @@ EXTRA_libffi_la_SOURCES = src/aarch64/ffi.c src/aarch64/sysv.S \
+ 	src/vax/ffi.c src/vax/elfbsd.S src/x86/ffi.c src/x86/sysv.S \
+ 	src/x86/ffiw64.c src/x86/win64.S src/x86/ffi64.c \
+ 	src/x86/unix64.S src/x86/sysv_intel.S src/x86/win64_intel.S \
+-	src/xtensa/ffi.c src/xtensa/sysv.S
++	src/xtensa/ffi.c src/xtensa/sysv.S \
++	src/kvx/ffi.c src/kvx/sysv.S
+ 
+ TARGET_OBJ = @TARGET_OBJ@
+ libffi_la_LIBADD = $(TARGET_OBJ)
+diff --git a/README.md b/README.md
+index 3d6ce44..87c0c6e 100644
+--- a/README.md
++++ b/README.md
+@@ -61,6 +61,7 @@ tested:
+ | AVR32           | Linux            | GCC                     |
+ | Blackfin        | uClinux          | GCC                     |
+ | HPPA            | HPUX             | GCC                     |
++| KVX             | Linux            | GCC                     |
+ | IA-64           | Linux            | GCC                     |
+ | M68K            | FreeMiNT         | GCC                     |
+ | M68K            | Linux            | GCC                     |
+diff --git a/configure.host b/configure.host
+index 9a72cda..6f95794 100644
+--- a/configure.host
++++ b/configure.host
+@@ -134,6 +134,11 @@ case "${host}" in
+ 	SOURCES="ffi.c unix.S"
+ 	;;
+ 
++  kvx-*-*)
++	TARGET=KVX; TARGETDIR=kvx
++	SOURCES="ffi.c sysv.S"
++	;;
++
+   m32r*-*-*)
+ 	TARGET=M32R; TARGETDIR=m32r
+ 	SOURCES="ffi.c sysv.S"
+diff --git a/src/kvx/asm.h b/src/kvx/asm.h
+new file mode 100644
+index 0000000..4edba41
+--- /dev/null
++++ b/src/kvx/asm.h
+@@ -0,0 +1,5 @@
++/* args are passed on registers from r0 up to r11 => 12*8 bytes */
++#define REG_ARGS_SIZE (12*8)
++#define KVX_REGISTER_SIZE (8)
++#define KVX_ABI_SLOT_SIZE (KVX_REGISTER_SIZE)
++#define KVX_ABI_MAX_AGGREGATE_IN_REG_SIZE (4*KVX_ABI_SLOT_SIZE)
+diff --git a/src/kvx/ffi.c b/src/kvx/ffi.c
+new file mode 100644
+index 0000000..58f6aef
+--- /dev/null
++++ b/src/kvx/ffi.c
+@@ -0,0 +1,273 @@
++/* Copyright (c) 2020 Kalray
++
++Permission is hereby granted, free of charge, to any person obtaining
++a copy of this software and associated documentation files (the
++``Software''), to deal in the Software without restriction, including
++without limitation the rights to use, copy, modify, merge, publish,
++distribute, sublicense, and/or sell copies of the Software, and to
++permit persons to whom the Software is furnished to do so, subject to
++the following conditions:
++
++The above copyright notice and this permission notice shall be
++included in all copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED ``AS IS'', WITHOUT WARRANTY OF ANY KIND,
++EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
++IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
++CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
++TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
++SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
++
++#if defined(__kvx__)
++#include <stdio.h>
++#include <stdlib.h>
++#include <stdint.h>
++#include <fficonfig.h>
++#include <ffi.h>
++#include "ffi_common.h"
++#include "asm.h"
++
++#define ALIGN(x, a) ALIGN_MASK(x, (typeof(x))(a) - 1)
++#define ALIGN_MASK(x, mask) (((x) + (mask)) & ~(mask))
++#define KVX_ABI_STACK_ALIGNMENT (32)
++#define KVX_ABI_STACK_ARG_ALIGNMENT (8)
++#define max(a,b) ((a) > (b) ? (a) : (b))
++
++#ifdef FFI_DEBUG
++#define DEBUG_PRINT(...) do{ fprintf( stderr, __VA_ARGS__ ); } while(0)
++#else
++#define DEBUG_PRINT(...)
++#endif
++
++struct ret_value {
++	unsigned long int r0;
++	unsigned long int r1;
++	unsigned long int r2;
++	unsigned long int r3;
++};
++
++extern struct ret_value ffi_call_SYSV(unsigned total_size,
++                                      unsigned size,
++                                      extended_cif *ecif,
++                                      unsigned *rvalue_addr,
++                                      void *fn,
++                                      unsigned int_ext_method);
++
++/* Perform machine dependent cif processing */
++ffi_status ffi_prep_cif_machdep(ffi_cif *cif)
++{
++  cif->flags = cif->rtype->size;
++  return FFI_OK;
++}
++
++/* ffi_prep_args is called by the assembly routine once stack space
++   has been allocated for the function's arguments */
++
++void *ffi_prep_args(char *stack, unsigned int arg_slots_size, extended_cif *ecif)
++{
++  char *stacktemp = stack;
++  char *current_arg_passed_by_value = stack + arg_slots_size;
++  int i, s;
++  ffi_type **arg;
++  int count = 0;
++  ffi_cif *cif = ecif->cif;
++  void **argv = ecif->avalue;
++
++  arg = cif->arg_types;
++
++  DEBUG_PRINT("stack: %p\n", stack);
++  DEBUG_PRINT("arg_slots_size: %u\n", arg_slots_size);
++  DEBUG_PRINT("current_arg_passed_by_value: %p\n", current_arg_passed_by_value);
++  DEBUG_PRINT("ecif: %p\n", ecif);
++  DEBUG_PRINT("ecif->avalue: %p\n", ecif->avalue);
++
++  for (i = 0; i < cif->nargs; i++) {
++
++    s = KVX_ABI_SLOT_SIZE;
++    switch((*arg)->type) {
++      case FFI_TYPE_SINT8:
++      case FFI_TYPE_UINT8:
++      case FFI_TYPE_SINT16:
++      case FFI_TYPE_UINT16:
++      case FFI_TYPE_SINT32:
++      case FFI_TYPE_UINT32:
++      case FFI_TYPE_FLOAT:
++      case FFI_TYPE_DOUBLE:
++      case FFI_TYPE_UINT64:
++      case FFI_TYPE_SINT64:
++      case FFI_TYPE_POINTER:
++        DEBUG_PRINT("INT64/32/16/8/FLOAT/DOUBLE or POINTER @%p\n", stack);
++        *(uint64_t *) stack = *(uint64_t *)(* argv);
++        break;
++
++      case FFI_TYPE_COMPLEX:
++        if ((*arg)->size == 8)
++          *(_Complex float *) stack = *(_Complex float *)(* argv);
++        else if ((*arg)->size == 16) {
++          *(_Complex double *) stack = *(_Complex double *)(* argv);
++          s = 16;
++        } else
++          abort();
++        break;
++      case FFI_TYPE_STRUCT: {
++        char *value;
++        unsigned int written_size = 0;
++        DEBUG_PRINT("struct by value @%p\n", stack);
++        if ((*arg)->size > KVX_ABI_MAX_AGGREGATE_IN_REG_SIZE) {
++          DEBUG_PRINT("big struct\n");
++          *(uint64_t *) stack = (uintptr_t)current_arg_passed_by_value;
++          value = current_arg_passed_by_value;
++          current_arg_passed_by_value += (*arg)->size;
++          written_size = KVX_ABI_SLOT_SIZE;
++        } else {
++          value = stack;
++          written_size = (*arg)->size;
++        }
++        memcpy(value, *argv, (*arg)->size);
++        s = ALIGN(written_size, KVX_ABI_STACK_ARG_ALIGNMENT);
++        break;
++      }
++      default:
++        printf("Error: unsupported arg type %d\n", (*arg)->type);
++        abort();
++        break;
++
++    }
++    stack += s;
++    count += s;
++    argv++;
++    arg++;
++  }
++#ifdef FFI_DEBUG
++  FFI_ASSERT(((intptr_t)(stacktemp + REG_ARGS_SIZE) & (KVX_ABI_STACK_ALIGNMENT-1)) == 0);
++#endif
++  return stacktemp + REG_ARGS_SIZE;
++}
++
++/* Perform machine dependent cif processing when we have a variadic function */
++
++ffi_status ffi_prep_cif_machdep_var(ffi_cif *cif, unsigned int nfixedargs,
++                                    unsigned int ntotalargs)
++{
++  cif->flags = cif->rtype->size;
++  return FFI_OK;
++}
++
++static unsigned long handle_small_int_ext(kvx_intext_method *int_ext_method,
++                                          const ffi_type *rtype)
++{
++  switch (rtype->type) {
++    case FFI_TYPE_SINT8:
++      *int_ext_method = KVX_RET_SXBD;
++      return KVX_REGISTER_SIZE;
++
++    case FFI_TYPE_SINT16:
++      *int_ext_method = KVX_RET_SXHD;
++      return KVX_REGISTER_SIZE;
++
++    case FFI_TYPE_SINT32:
++      *int_ext_method = KVX_RET_SXWD;
++      return KVX_REGISTER_SIZE;
++
++    case FFI_TYPE_UINT8:
++      *int_ext_method = KVX_RET_ZXBD;
++      return KVX_REGISTER_SIZE;
++
++    case FFI_TYPE_UINT16:
++      *int_ext_method = KVX_RET_ZXHD;
++      return KVX_REGISTER_SIZE;
++
++    case FFI_TYPE_UINT32:
++      *int_ext_method = KVX_RET_ZXWD;
++      return KVX_REGISTER_SIZE;
++
++    default:
++      *int_ext_method = KVX_RET_NONE;
++      return rtype->size;
++  }
++}
++
++void ffi_call(ffi_cif *cif, void (*fn)(void), void *rvalue, void **avalue)
++{
++  int i;
++  unsigned long int slot_fitting_args_size = 0;
++  unsigned long int total_size = 0;
++  unsigned long int big_struct_size = 0;
++  kvx_intext_method int_extension_method;
++  ffi_type **arg;
++  struct ret_value local_rvalue = {0};
++  size_t wb_size;
++
++
++  /* Calculate size to allocate on stack */
++  for (i = 0, arg = cif->arg_types; i < cif->nargs; i++, arg++) {
++    DEBUG_PRINT("argument %d, type %d, size %lu\n", i, (*arg)->type, (*arg)->size);
++    if (((*arg)->type == FFI_TYPE_STRUCT) || ((*arg)->type == FFI_TYPE_COMPLEX)) {
++      if ((*arg)->size <= KVX_ABI_MAX_AGGREGATE_IN_REG_SIZE) {
++        slot_fitting_args_size += ALIGN((*arg)->size, KVX_ABI_SLOT_SIZE);
++      } else {
++        slot_fitting_args_size += KVX_ABI_SLOT_SIZE; /* aggregate passed by reference */
++        big_struct_size += ALIGN((*arg)->size, KVX_ABI_SLOT_SIZE);
++      }
++    } else if ((*arg)->size <= KVX_ABI_SLOT_SIZE) {
++      slot_fitting_args_size += KVX_ABI_SLOT_SIZE;
++    } else {
++      printf("Error: unsupported arg size %ld arg type %d\n", (*arg)->size, (*arg)->type);
++      abort(); /* should never happen? */
++    }
++  }
++
++  extended_cif ecif;
++  ecif.cif = cif;
++  ecif.avalue = avalue;
++  ecif.rvalue = rvalue;
++
++  /* This implementation allocates anyway for all register based args */
++  slot_fitting_args_size = max(slot_fitting_args_size, REG_ARGS_SIZE);
++  total_size = slot_fitting_args_size + big_struct_size;
++  total_size = ALIGN(total_size, KVX_ABI_STACK_ALIGNMENT);
++
++  /* wb_size: write back size, the size we will need to write back to user
++   * provided buffer. In theory it should always be cif->flags which is
++   * cif->rtype->size. But libffi API mandates that for integral types
++   * of size <= system register size, then we *MUST* write back
++   * the size of system register size.
++   * in our case, if size <= 8 bytes we must write back 8 bytes.
++   * floats, complex and structs are not affected, only integrals.
++   */
++  wb_size = handle_small_int_ext(&int_extension_method, cif->rtype);
++
++  switch (cif->abi) {
++    case FFI_SYSV:
++      DEBUG_PRINT("total_size: %lu\n", total_size);
++      DEBUG_PRINT("slot fitting args size: %lu\n", slot_fitting_args_size);
++      DEBUG_PRINT("rvalue: %p\n", rvalue);
++      DEBUG_PRINT("fn: %p\n", fn);
++      DEBUG_PRINT("rsize: %u\n", cif->flags);
++      DEBUG_PRINT("wb_size: %u\n", wb_size);
++      DEBUG_PRINT("int_extension_method: %u\n", int_extension_method);
++      local_rvalue = ffi_call_SYSV(total_size, slot_fitting_args_size,
++                                   &ecif, rvalue, fn, int_extension_method);
++      if ((cif->flags <= KVX_ABI_MAX_AGGREGATE_IN_REG_SIZE)
++          && (cif->rtype->type != FFI_TYPE_VOID))
++        memcpy(rvalue, &local_rvalue, wb_size);
++      break;
++    default:
++      abort();
++      break;
++  }
++}
++
++/* Closures not supported yet */
++ffi_status
++ffi_prep_closure_loc (ffi_closure* closure,
++                      ffi_cif* cif,
++                      void (*fun)(ffi_cif*,void*,void**,void*),
++                      void *user_data,
++                      void *codeloc)
++{
++  return FFI_BAD_ABI;
++}
++
++#endif /* (__kvx__) */
+diff --git a/src/kvx/ffitarget.h b/src/kvx/ffitarget.h
+new file mode 100644
+index 0000000..8df8735
+--- /dev/null
++++ b/src/kvx/ffitarget.h
+@@ -0,0 +1,75 @@
++/* -----------------------------------------------------------------------
++   ffitarget.h - Copyright (c) 2020 Kalray
++
++   KVX Target configuration macros
++
++   Permission is hereby granted, free of charge, to any person obtaining
++   a copy of this software and associated documentation files (the
++   ``Software''), to deal in the Software without restriction, including
++   without limitation the rights to use, copy, modify, merge, publish,
++   distribute, sublicense, and/or sell copies of the Software, and to
++   permit persons to whom the Software is furnished to do so, subject to
++   the following conditions:
++
++   The above copyright notice and this permission notice shall be included
++   in all copies or substantial portions of the Software.
++
++   THE SOFTWARE IS PROVIDED ``AS IS'', WITHOUT WARRANTY OF ANY KIND,
++   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++   NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++   HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
++   DEALINGS IN THE SOFTWARE.
++   ----------------------------------------------------------------------- */
++
++#ifndef LIBFFI_TARGET_H
++#define LIBFFI_TARGET_H
++
++#ifndef LIBFFI_H
++#error "Please do not include ffitarget.h directly into your source. Use ffi.h instead."
++#endif
++
++/* ---- System specific configurations ----------------------------------- */
++
++#ifndef LIBFFI_ASM
++typedef unsigned long          ffi_arg;
++typedef signed long            ffi_sarg;
++
++typedef enum ffi_abi {
++  FFI_FIRST_ABI = 0,
++  FFI_SYSV,
++  FFI_LAST_ABI,
++  FFI_DEFAULT_ABI = FFI_SYSV
++} ffi_abi;
++
++/* Those values are set depending on return type
++ * they are used in the assembly code in sysv.S
++ */
++typedef enum kvx_intext_method {
++  KVX_RET_NONE = 0,
++  KVX_RET_SXBD = 1,
++  KVX_RET_SXHD = 2,
++  KVX_RET_SXWD = 3,
++  KVX_RET_ZXBD = 4,
++  KVX_RET_ZXHD = 5,
++  KVX_RET_ZXWD = 6
++} kvx_intext_method;
++
++#endif
++
++/* ---- Definitions for closures ----------------------------------------- */
++
++/* This is only to allow Python to compile
++ * but closures are not supported yet
++ */
++#define FFI_CLOSURES 1
++#define FFI_TRAMPOLINE_SIZE 0
++
++#define FFI_NATIVE_RAW_API 0
++#define FFI_TARGET_SPECIFIC_VARIADIC 1
++#define FFI_TARGET_HAS_COMPLEX_TYPE
++
++#endif
++
+diff --git a/src/kvx/sysv.S b/src/kvx/sysv.S
+new file mode 100644
+index 0000000..952afc7
+--- /dev/null
++++ b/src/kvx/sysv.S
+@@ -0,0 +1,127 @@
++/* Copyright (c) 2020 Kalray
++
++Permission is hereby granted, free of charge, to any person obtaining
++a copy of this software and associated documentation files (the
++``Software''), to deal in the Software without restriction, including
++without limitation the rights to use, copy, modify, merge, publish,
++distribute, sublicense, and/or sell copies of the Software, and to
++permit persons to whom the Software is furnished to do so, subject to
++the following conditions:
++
++The above copyright notice and this permission notice shall be
++included in all copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED ``AS IS'', WITHOUT WARRANTY OF ANY KIND,
++EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
++IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
++CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
++TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
++SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
++
++#if defined(__kvx__)
++#define LIBFFI_ASM
++#include <fficonfig.h>
++#include <ffi.h>
++#include <ffi_cfi.h>
++#include <kvx/asm.h>
++
++.text
++.global ffi_call_SYSV
++.type ffi_call_SYSV, @function
++.type ffi_prep_args, @function
++.align 8
++
++/* ffi_call_SYSV
++
++  r0: total size to allocate on stack
++  r1: size of arg slots
++  r2: extended cif structure, DO NOT REMOVE: it is used by ffi_prep_args()
++  r3: return value address
++  r4: function to call
++  r5: integer sign extension method to be used
++*/
++ffi_call_SYSV:
++	addd $r12 = $r12, -64
++	so (-32)[$r12] = $r20r21r22r23
++	;;
++	sd (0)[$r12] = $r24
++	;;
++	get $r23 = $ra
++	copyd $r20 = $r12
++	sbfd $r12 = $r0, $r12
++	;;
++	copyd $r0 = $r12
++	copyd $r21 = $r3
++	copyd $r22 = $r4
++	copyd $r24 = $r5
++	call ffi_prep_args
++	;;
++	lo $r8r9r10r11 = (64)[$r12]
++	;;
++	lo $r4r5r6r7 = (32)[$r12]
++	;;
++	lo $r0r1r2r3 = (0)[$r12]
++	copyd $r12 = $r0
++	/* $r15 is the register used by the ABI to return big (>32 bytes)
++	 * structs by value.
++	 * It is also referred to as the "struct register" in the ABI.
++	 */
++	copyd $r15 = $r21
++	icall $r22
++	;;
++	pcrel $r4 = @pcrel(.Ltable)
++	cb.deqz $r24 ? .Lend
++	;;
++	addx8d $r24 = $r24, $r4
++	;;
++	igoto $r24
++	;;
++.Ltable:
++0: /* we should never arrive here */
++	goto .Lerror
++	nop
++	;;
++1: /* Sign extend byte to double */
++	sxbd $r0 = $r0
++	goto .Lend
++	;;
++2: /* Sign extend half to double */
++	sxhd $r0 = $r0
++	goto .Lend
++	;;
++3: /* Sign extend word to double */
++	sxwd $r0 = $r0
++	goto .Lend
++	;;
++4: /* Zero extend byte to double */
++	zxbd $r0 = $r0
++	goto .Lend
++	;;
++5: /* Zero extend half to double */
++	zxhd $r0 = $r0
++	goto .Lend
++	;;
++6: /* Zero extend word to double */
++	zxwd $r0 = $r0
++	/* Fallthrough to .Lend */
++	;;
++.Lend:
++	ld $r24 = (0)[$r12]
++	;;
++	set $ra = $r23
++	lo $r20r21r22r23 = (32)[$r20]
++	addd $r12 = $r20, 64
++	;;
++	ret
++	;;
++.Lerror:
++	errop
++	;;
++
++#endif /* __kvx__ */
++
++#if defined __ELF__ && defined __linux__
++	.section .note.GNU-stack,"",%progbits
++#endif
++
+-- 
+2.26.2
+
