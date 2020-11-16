@@ -88,6 +88,11 @@ $(1)_KCONFIG_DEPENDENCIES = \
 	$(BR2_BISON_HOST_DEPENDENCY) \
 	$(BR2_FLEX_HOST_DEPENDENCY)
 
+# Starting with barebox v2020.09.0, the kconfig used calls the
+# cross-compiler to check its capabilities. So we need the
+# toolchain before we can call the configurators.
+$(1)_KCONFIG_DEPENDENCIES += toolchain
+
 ifeq ($$(BR2_TARGET_$(1)_BAREBOXENV),y)
 define $(1)_BUILD_BAREBOXENV_CMDS
 	$$(TARGET_CC) $$(TARGET_CFLAGS) $$(TARGET_LDFLAGS) -o $$(@D)/bareboxenv \
