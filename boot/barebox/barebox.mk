@@ -113,10 +113,21 @@ define $(1)_INSTALL_CUSTOM_ENV
 endef
 endif
 
+define KVX_FIXUP
+	$$(if $$(BR2_kvx),
+		$$(SED) '/CONFIG_ARCH_COOLIDGE_*/d' $$(@D)/.config
+		$$(call KCONFIG_ENABLE_OPT,CONFIG_ARCH_COOLIDGE_$$(call qstrip,$$(BR2_KVX_COOLIDGE_VERSION))))
+endef
+
 ifneq ($$($(1)_CUSTOM_EMBEDDED_ENV_PATH),)
 define $(1)_KCONFIG_FIXUP_CMDS
 	$$(call KCONFIG_ENABLE_OPT,CONFIG_DEFAULT_ENVIRONMENT)
 	$$(call KCONFIG_SET_OPT,CONFIG_DEFAULT_ENVIRONMENT_PATH,"$$($(1)_CUSTOM_EMBEDDED_ENV_PATH)")
+	$$(KVX_FIXUP)
+endef
+else
+define $(1)_KCONFIG_FIXUP_CMDS
+	$$(KVX_FIXUP)
 endef
 endif
 
