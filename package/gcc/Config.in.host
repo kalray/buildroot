@@ -86,7 +86,7 @@ config BR2_GCC_VERSION
 	default "8.4.0"     if BR2_GCC_VERSION_8_X
 	default "9.3.0"     if BR2_GCC_VERSION_9_X
 	default "arc-2019.09-release" if BR2_GCC_VERSION_ARC
-	default "f98c17b1e78dd3a3da45c0ac1af7b105edf2bf66" if BR2_GCC_VERSION_KVX
+	default "47c78fee1e4d7343713d41739c6d19d3faab572b" if BR2_GCC_VERSION_KVX
 	default "48152afb96c59733d5bc79e3399bb7b3d4b44266" if BR2_GCC_VERSION_CSKY
 
 config BR2_EXTRA_GCC_CONFIG_OPTIONS
