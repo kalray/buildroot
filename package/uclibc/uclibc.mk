@@ -4,11 +4,10 @@
 #
 ################################################################################
 
+UCLIBC_VERSION = $(call qstrip,$(BR2_UCLIBC_VERSION))
 ifeq ($(BR2_kvx),y)
-UCLIBC_VERSION = 7a9abef30d4e493c86123bb8872b2f7874c375a0
 UCLIBC_SITE = $(call github,kalray,uclibc-ng,$(UCLIBC_VERSION))
 else
-UCLIBC_VERSION = 1.0.34
 UCLIBC_SOURCE = uClibc-ng-$(UCLIBC_VERSION).tar.xz
 UCLIBC_SITE = https://downloads.uclibc-ng.org/releases/$(UCLIBC_VERSION)
 endif
