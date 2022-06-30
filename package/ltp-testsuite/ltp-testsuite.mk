@@ -20,6 +20,7 @@ endif
 ifeq ($(BR2_PACKAGE_LTP_TESTSUITE_REALTIME),y)
 LTP_TESTSUITE_CONF_OPTS += --with-realtime-testsuite
 endif
+LTP_TESTSUITE_AUTORECONF = YES
 
 ifeq ($(BR2_LINUX_KERNEL),y)
 LTP_TESTSUITE_DEPENDENCIES += linux
@@ -47,11 +48,13 @@ else
 LTP_TESTSUITE_CONF_ENV += have_numa_headers=no
 endif
 
+ifeq ($(BR2_kvx),)
 # ltp-testsuite uses <fts.h>, which isn't compatible with largefile
 # support.
 LTP_TESTSUITE_CFLAGS = $(filter-out -D_FILE_OFFSET_BITS=64,$(TARGET_CFLAGS))
 LTP_TESTSUITE_CPPFLAGS = $(filter-out -D_FILE_OFFSET_BITS=64,$(TARGET_CPPFLAGS))
 LTP_TESTSUITE_LIBS =
+endif
 
 ifeq ($(BR2_PACKAGE_LIBTIRPC),y)
 LTP_TESTSUITE_DEPENDENCIES += libtirpc host-pkgconf
@@ -96,5 +99,23 @@ define LTP_TESTSUITE_REMOVE_UNSUPPORTED_TESTCASES
 endef
 
 LTP_TESTSUITE_POST_PATCH_HOOKS += LTP_TESTSUITE_REMOVE_UNSUPPORTED_TESTCASES
+
+ifeq ($(BR2_kvx),y)
+define LTP_TESTSUITE_INSTALL_TO_OPT
+	# For KVX the tests are removed from the $(TARGET_DIR) because the rootfs
+	# would grow to big to properly run the tests on HAPS. Instead store the
+	# tests in the ${TEST_DIR}. Robot will then scp them later to the running
+	# target.
+	# TODO: Remove the entire hook and find a cleaner solution
+	cd $(TOPDIR)/../scripts/tools && \
+	./copy_ltp_tests_from_csv_to_target.sh \
+		$(TARGET_DIR)/usr/lib/ltp-testsuite \
+		$(TOPDIR)/../workspace/devimage/linux_binaries/opt/ltp \
+		$(TOPDIR)/../linux_valid/CoolidgeTestsuite/ltp/ltp.csv
+	rm -rf $(TARGET_DIR)/usr/lib/ltp-testsuite
+endef
+
+LTP_TESTSUITE_POST_INSTALL_TARGET_HOOKS += LTP_TESTSUITE_INSTALL_TO_OPT
+endif
 
 $(eval $(autotools-package))
