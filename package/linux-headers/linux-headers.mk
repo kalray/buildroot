@@ -44,7 +44,10 @@ endif
 endif
 
 # Compute LINUX_HEADERS_SOURCE and LINUX_HEADERS_SITE from the configuration
-ifeq ($(LINUX_HEADERS_CUSTOM_TARBALL),y)
+ifeq ($(BR2_KERNEL_HEADERS_AS_KERNEL),y)
+LINUX_HEADERS_SOURCE = $(LINUX_SOURCE)
+LINUX_HEADERS_SITE = $(LINUX_SITE)
+else ifeq ($(LINUX_HEADERS_CUSTOM_TARBALL),y)
 ifeq ($(BR_BUILDING),y)
 ifeq ($(LINUX_HEADERS_CUSTOM_TARBALL_LOCATION),)
 $(error No kernel headers tarball location set, check your BR2_KERNEL_HEADERS_CUSTOM_TARBALL_LOCATION setting)

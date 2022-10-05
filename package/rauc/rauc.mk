@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-RAUC_VERSION = 1.10
+RAUC_VERSION = $(call qstrip,$(BR2_RAUC_VERSION))
 RAUC_SITE = https://github.com/rauc/rauc/releases/download/v$(RAUC_VERSION)
 RAUC_SOURCE = rauc-$(RAUC_VERSION).tar.xz
 RAUC_LICENSE = LGPL-2.1
@@ -37,6 +37,14 @@ RAUC_CONF_OPTS += -Dgpt=enabled
 RAUC_DEPENDENCIES += util-linux-libs
 else
 RAUC_CONF_OPTS += -Dgpt=disabled
+endif
+
+ifeq ($(BR2_kvx),y)
+RAUC_SITE = $(call kalray,rauc,$(RAUC_VERSION))
+RAUC_SOURCE = rauc-$(RAUC_VERSION).tar.gz
+ifneq ($(call qstrip,$(BR2_KALRAY_SITE)),)
+BR_NO_CHECK_HASH_FOR += $(RAUC_SOURCE)
+endif
 endif
 
 ifeq ($(BR2_PACKAGE_RAUC_NETWORK),y)
