@@ -16,7 +16,7 @@ define STRACE_BOOTSTRAP_HOOK
 	$(SED) 's%^\(autoreconf.*\)%#\1%' $(@D)/bootstrap
 	(cd $(@D); ./bootstrap)
 endef
-STRACE_POST_PATCH_HOOKS += STRACE_BOOTSTRAP_HOOK
+STRACE_PRE_CONFIGURE_HOOKS += STRACE_BOOTSTRAP_HOOK
 else
 STRACE_VERSION = 6.4
 STRACE_SOURCE = strace-$(STRACE_VERSION).tar.xz
