@@ -7,6 +7,7 @@ config BR2_PACKAGE_LIBSECCOMP_ARCH_SUPPORTS
 	default y if BR2_powerpc64 || BR2_powerpc
 	default y if BR2_RISCV_64
 	default y if BR2_s390x
+	default y if BR2_kvx
 
 config BR2_PACKAGE_LIBSECCOMP
 	bool "libseccomp"
