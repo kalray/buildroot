@@ -22,6 +22,7 @@ config BR2_PACKAGE_UCLIBC_ARCH_SUPPORTS
 	default y if BR2_sparc
 	default y if BR2_xtensa
 	default y if BR2_x86_64
+	default y if BR2_kvx
 
 config BR2_PACKAGE_UCLIBC_SUPPORTS
 	bool
