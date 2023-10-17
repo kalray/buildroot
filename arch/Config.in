@@ -80,7 +80,7 @@ config BR2_i386
 config BR2_kvx
 	bool "kvx"
 	select BR2_ARCH_IS_64
-	select BR2_ARCH_HAS_MMU_MANDATORY
+	select BR2_USE_MMU
 	help
 	  Kalray MPPA architecture support.
 	  https://www.kalrayinc.com/portfolio/processors/
