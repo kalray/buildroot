@@ -22,6 +22,10 @@ BINUTILS_FROM_GIT = y
 else ifeq ($(BR2_kvx),y)
 BINUTILS_SITE = $(call kalray,binutils,$(BINUTILS_VERSION))
 BINUTILS_SOURCE = binutils-$(BINUTILS_VERSION).tar.gz
+define BINUTILS_BUMP_AUTOTOOLS_VERSION
+ $(SED) 's/\[m4_define(\[_GCC_AUTOCONF_VERSION\], \[2\.69\])])/\[m4_define(\[_GCC_AUTOCONF_VERSION\], \[2\.71\])]\)/' $(@D)/config/override.m4
+endef
+HOST_BINUTILS_PRE_CONFIGURE_HOOKS += BINUTILS_BUMP_AUTOTOOLS_VERSION
 ifneq ($(call qstrip,$(BR2_KALRAY_SITE)),)
 BR_NO_CHECK_HASH_FOR += $(BINUTILS_SOURCE)
 endif
