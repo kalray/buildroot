@@ -86,7 +86,8 @@ LTP_TESTSUITE_UNSUPPORTED_TEST_CASES_$(BR2_TOOLCHAIN_USES_MUSL) += \
 	testcases/kernel/syscalls/fmtmsg/fmtmsg01.c \
 	testcases/kernel/syscalls/rt_tgsigqueueinfo/rt_tgsigqueueinfo01.c \
 	testcases/kernel/syscalls/timer_create/timer_create01.c \
-	testcases/kernel/syscalls/timer_create/timer_create03.c
+	testcases/kernel/syscalls/timer_create/timer_create03.c \
+	testcases/kernel/syscalls/getcontext/getcontext01.c
 
 # ldd command build system tries to build a shared library unconditionally.
 LTP_TESTSUITE_UNSUPPORTED_TEST_CASES_$(BR2_STATIC_LIBS) += \
