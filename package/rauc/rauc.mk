@@ -16,6 +16,7 @@ RAUC_INSTALL_STAGING = YES
 ifeq ($(BR2_kvx),y)
 RAUC_SITE = $(call kalray,rauc,$(RAUC_VERSION))
 RAUC_SOURCE = rauc-$(RAUC_VERSION).tar.gz
+RAUC_AUTORECONF = YES
 ifneq ($(call qstrip,$(BR2_KALRAY_SITE)),)
 BR_NO_CHECK_HASH_FOR += $(RAUC_SOURCE)
 endif
