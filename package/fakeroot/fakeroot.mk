@@ -9,6 +9,7 @@ FAKEROOT_SOURCE = fakeroot_$(FAKEROOT_VERSION).orig.tar.gz
 FAKEROOT_SITE = https://snapshot.debian.org/archive/debian/20230724T160429Z/pool/main/f/fakeroot
 
 HOST_FAKEROOT_DEPENDENCIES = host-acl
+FAKEROOT_AUTORECONF = YES
 # Force capabilities detection off
 # For now these are process capabilities (faked) rather than file
 # so they're of no real use

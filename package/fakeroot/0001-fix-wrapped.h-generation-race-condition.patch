@@ -1,0 +1,36 @@
+From 6757bd9db63dcf37d828b9f036a476d5ebcbbf6a Mon Sep 17 00:00:00 2001
+From: Jonathan Borne <jborne@kalray.eu>
+Date: Tue, 24 Oct 2023 16:56:57 +0200
+Subject: [PATCH] fix wrapped.h generation race condition
+
+---
+ Makefile.am | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/Makefile.am b/Makefile.am
+index 4c1dfb1..03d02b7 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -51,10 +51,18 @@ if MACOSX
+ wrapped.h wrapdef.h wrapstruct.h wraptmpf.h:wrapawk_macosx wrapfunc.inp
+ 	awk -f $(srcdir)/wrapawk_macosx < $(srcdir)/wrapfunc.inp
+ else !MACOSX
+-wrapped.h wrapdef.h wrapstruct.h wraptmpf.h:wrapawk wrapfunc.inp
++# avoid race condition when building in parallel
++# wrapped.h wrapdef.h wrapstruct.h wraptmpf.h need to be build in single invocation
++.sentinel :wrapawk wrapfunc.inp
+ 	awk -f $(srcdir)/wrapawk < $(srcdir)/wrapfunc.inp
++	@touch $@
++
++wrapped.h wrapdef.h wrapstruct.h wraptmpf.h: .sentinel;
+ endif !MACOSX
+ 
++# Add missing dependency to wrapped.h
++libfakeroot_time64.c:wrapped.h
++
+ libfakeroot.lo:libfakeroot.c wrapdef.h wrapstruct.h wraptmpf.h
+ 
+ fakerootconfig.h: ./config.status
+-- 
+2.17.1
+
