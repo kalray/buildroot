@@ -18,6 +18,12 @@ LIBFUSE3_CONF_OPTS = \
 	-Duseroot=false \
 	-Dtests=false
 
+HOST_LIBFUSE3_CONF_OPTS = \
+	-Dexamples=false \
+	-Dudevrulesdir=$(HOST_DIR)/lib/udev/rules.d \
+	-Duseroot=false \
+	-Dtests=false
+
 define LIBFUSE3_DEVICES
 	/dev/fuse c 666 0 0 10 229 0 0 -
 endef
@@ -31,3 +37,4 @@ define LIBFUSE3_LINUX_CONFIG_FIXUPS
 endef
 
 $(eval $(meson-package))
+$(eval $(host-meson-package))
