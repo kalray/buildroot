@@ -90,6 +90,7 @@ config BR2_GCC_VERSION_12_X
 
 config BR2_GCC_CUSTOM_VERSION
 	bool "Custom version"
+	select BR2_TOOLCHAIN_GCC_AT_LEAST_12
 	help
 	  This option allows to use a specific official versions
 
