@@ -20,7 +20,8 @@ LIBFUSE3_CONF_OPTS = \
 
 HOST_LIBFUSE3_CONF_OPTS = \
 	-Dexamples=false \
-	-Dudevrulesdir=$(HOST_DIR)/lib/udev/rules.d \
+	-Dudevrulesdir="" \
+	-Dinitscriptdir="" \
 	-Duseroot=false \
 	-Dtests=false
 
