@@ -239,7 +239,10 @@ ifneq ($(GCC_TARGET_CPU),)
 ifeq ($(BR2_powerpc),y)
 HOST_GCC_COMMON_CONF_OPTS += --with-cpu-32=$(GCC_TARGET_CPU)
 else
+# kvx toolchain do not support --with-cpu option
+ifneq ($(BR2_kvx),y)
 HOST_GCC_COMMON_CONF_OPTS += --with-cpu=$(GCC_TARGET_CPU)
+endif
 endif
 endif
 
