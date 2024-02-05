@@ -64,6 +64,8 @@ else ifeq ($(BR2_sparc64),y)
 PKG_MESON_TARGET_CPU_FAMILY = sparc64
 else ifeq ($(BR2_x86_64),y)
 PKG_MESON_TARGET_CPU_FAMILY = x86_64
+else ifeq ($(BR2_kvx),y)
+PKG_MESON_TARGET_CPU_FAMILY = kvx
 else
 PKG_MESON_TARGET_CPU_FAMILY = $(ARCH)
 endif
