@@ -480,7 +480,6 @@ endmenu
 	source "package/dbus/Config.in"
 	source "package/dbus-broker/Config.in"
 	source "package/dbus-cpp/Config.in"
-	source "package/dbus-cxx/Config.in"
 	source "package/dbus-glib/Config.in"
 	source "package/dbus-python/Config.in"
 	source "package/dbus-triggerd/Config.in"
