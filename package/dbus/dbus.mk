@@ -34,6 +34,8 @@ DBUS_CONF_OPTS = \
 	--disable-xml-docs \
 	--disable-doxygen-docs \
 	--with-system-socket=/run/dbus/system_bus_socket \
+	--with-test-socket-dir=/tmp \
+	--with-session-socket-dir=/tmp \
 	--with-system-pid-file=/run/messagebus.pid
 
 ifeq ($(BR2_STATIC_LIBS),y)
