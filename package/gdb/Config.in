@@ -24,7 +24,7 @@ config BR2_PACKAGE_GDB
 	# The or1k musl port is incomplete, elf_gregset_t definition is missing:
 	# https://git.musl-libc.org/cgit/musl/tree/arch/or1k/bits/user.h?h=v1.2.3
 	depends on !BR2_or1k || !BR2_TOOLCHAIN_USES_MUSL
-	depends on BR2_PACKAGE_LIBICONV
+	select BR2_PACKAGE_LIBICONV if !BR2_ENABLE_LOCALE
 	# When the external toolchain gdbserver is copied to the
 	# target, we don't allow building a separate gdbserver. The
 	# one from the external toolchain should be used.

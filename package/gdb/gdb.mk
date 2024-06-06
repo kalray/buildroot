@@ -243,7 +243,7 @@ endif
 ifeq ($(BR2_kvx),y)
 GDB_CONF_ENV += LDFLAGS="$$LDFLAGS -latomic"
 GDB_CONF_OPTS += --with-libgmp-prefix
-GDB_DEPENDENCIES += gmp libiconv
+GDB_DEPENDENCIES += gmp
 define GDB_INSTALL_SOS
 	$(INSTALL) $(@D)/$(GDB_SUBDIR)/opcodes/.libs/libopcodes-*.so $(TARGET_DIR)/usr/lib
 	$(INSTALL) $(@D)/$(GDB_SUBDIR)/bfd/.libs/libbfd-*.so $(TARGET_DIR)/usr/lib
