@@ -56,7 +56,8 @@ ifeq ($(BR2_aarch64),y)
 OPTEE_OS_MAKE_OPTS += \
 	CFG_ARM64_core=y \
 	CFG_USER_TA_TARGETS=ta_arm64
-else
+endif
+ifeq ($(BR2_arm),y)
 OPTEE_OS_MAKE_OPTS += \
 	CFG_ARM32_core=y
 endif
