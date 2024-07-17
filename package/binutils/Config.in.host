@@ -51,7 +51,7 @@ config BR2_BINUTILS_VERSION
 	default "2.39"		if BR2_BINUTILS_VERSION_2_39_X
 	default "2.40"		if BR2_BINUTILS_VERSION_2_40_X
 	default "2.41"		if BR2_BINUTILS_VERSION_2_41_X
-	default "c5e8437af055869c8666a1c1e5a391d9af5be0c0" if BR2_BINUTILS_VERSION_KVX
+	default "36c6e9ec960aa92a8b41b97fe5facd9a9abbb039" if BR2_BINUTILS_VERSION_KVX
 
 config BR2_BINUTILS_GPROFNG
 	bool "gprofng support"
